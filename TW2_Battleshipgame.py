@@ -3,7 +3,8 @@ import os
 import random
 from colorama import Fore, Style
 
-battlefieldsize = None
+GRIDSIZE = 10  # 10 makes the most sense, ship placement is possible and does not take too long
+AImode = False
 
 if "demo" in sys.argv:
     player1ships = {"h2": 0, "h3": 1, "h5": 0, "v2": 0, "v3": 0, "v5": 0}
@@ -35,17 +36,17 @@ def displayships(listofships):
           str(listofships["v3"]) + "x  v5 " + str(listofships["v5"]) + "x")
 
 
-def creategrid(gridsize):
-    grid = [["  ~" for i in range(gridsize)] for i in range(gridsize)]
+def creategrid(grid_size):
+    grid = [["  ~" for i in range(grid_size)] for i in range(grid_size)]
     return grid
 
 
-def showgrid(gridsize, grid):
-    for i in range(gridsize + 1):
+def showgrid(grid_size, grid):
+    for i in range(grid_size + 1):
         if i == 0:
             sys.stdout.write(Style.BRIGHT + Fore.GREEN + '   ')
             continue
-        if i == gridsize:
+        if i == grid_size:
             print(' ', str(i - 1) + Fore.RESET)
             break
         sys.stdout.write(str('{:3}'.format(i - 1)))
@@ -75,7 +76,24 @@ def validateposition(grid, direction, units, x0, y0):
     return True
 
 
-def placementprocess(grid, playerships):
+def generate_cordinates(grid_size):
+    return random.randint(0, grid_size-1)
+
+
+def placementprocess(grid, playerships, placement_mode=2):
+    if placement_mode == 1:
+        while True:
+            AI_shiplist = []  # The AI will also work if more than 1 of each shiptype is present
+            for key, value in player1ships.items():
+                i = 0
+                while i < value:
+                    if not place(generate_cordinates(GRIDSIZE), generate_cordinates(GRIDSIZE), grid, key):
+                        continue
+                    else:
+                        i += 1
+
+            return
+
     while True:
         shiptype = input('Choose shiptype: ')
         if shiptype not in playerships or playerships[shiptype] == 0:
@@ -87,7 +105,7 @@ def placementprocess(grid, playerships):
     while True:
         try:
             x = int(input('Pick your ship\'s x coordinate: '))
-            if 0 > x > battlefieldsize - 1:
+            if 0 > x > grid_size - 1:
                 print('This coordinate is out of range!')
                 continue
         except ValueError:
@@ -95,7 +113,7 @@ def placementprocess(grid, playerships):
             continue
         try:
             y = int(input('Pick your ship\'s y coordinate: '))
-            if 0 > y > battlefieldsize - 1:
+            if 0 > y > grid_size - 1:
                 print('This coordinate is out of range!')
                 continue
         except ValueError:
@@ -105,7 +123,7 @@ def placementprocess(grid, playerships):
             continue
         else:
             playerships[shiptype] = playerships[shiptype] - 1
-            break
+            return
 
 
 def place(x, y, grid, shiptype):
@@ -161,16 +179,22 @@ def place(x, y, grid, shiptype):
         return True
 
 
-def shootingprocess(gridsize, grid, grid_visible):
+def shootingprocess(grid_size, grid, grid_visible, mode=False):
+    if mode:
+        if shoot(generate_cordinates(grid_size), generate_cordinates(grid_size), grid, grid_visible):
+            return 'AI\'s got a hit!'
+        else:
+            return 'AI missed!'
+
     print('Specify the coordinates of the target!')
     while True:
         try:
             x = int(input('x:'))
-            if x > gridsize - 1:
+            if x > grid_size - 1:
                 print('This coordinate is too large!')
                 continue
             y = int(input('y:'))
-            if y > gridsize - 1:
+            if y > grid_size - 1:
                 print('This coordinate is too large!')
                 continue
         except ValueError:
@@ -212,31 +236,37 @@ else:
 
 while True:
     try:
-        battlefieldsize = int(input("Enter gridsize..(int, >5 <11)"))
-        if battlefieldsize > 5 and battlefieldsize < 11:
-            break
-        else:
-            print ("this gridsize is invalid!")
+        gamemode = int(input("Please choose game mode: AI = 1 or Players = 2:  "))
+        if gamemode < 1 or gamemode > 2:
+            print ("This gamemode is invalid, please try again!")
             continue
     except ValueError:
         print('incorrect input!')
         continue
+    if gamemode == 1:
+        AImode = True
+    break
 
-grid1 = creategrid(battlefieldsize)
-grid2 = creategrid(battlefieldsize)
-grid1_visible = creategrid(battlefieldsize)
-grid2_visible = creategrid(battlefieldsize)
+grid1 = creategrid(GRIDSIZE)
+grid2 = creategrid(GRIDSIZE)
+grid1_visible = creategrid(GRIDSIZE)
+grid2_visible = creategrid(GRIDSIZE)
 
 # -- Placement stage loop --
 
 print('PLAYER 1 - PLACE YOUR SHIPS!')
-showgrid(battlefieldsize, grid1)
+showgrid(GRIDSIZE, grid1)
 displayships(player1ships)
 
 while True:
-    placementprocess(grid1, player1ships)
-    showgrid(battlefieldsize, grid1)
-    displayships(player1ships)
+    if gamemode == 1:
+        placementprocess(grid1, player1ships, gamemode)
+        showgrid(GRIDSIZE, grid1)
+        break
+    else:
+        placementprocess(grid1, player1ships)
+        showgrid(GRIDSIZE, grid1)
+        displayships(player1ships)
 
     player1ships_values = player1ships.values()
     ships_remaining = 0
@@ -250,12 +280,12 @@ while True:
 os.system('clear')
 print("PLAYER 1 - PLACEMENT COMPLETE!")
 print('PLAYER 2 - PLACE YOUR SHIPS!')
-showgrid(battlefieldsize, grid2)
+showgrid(GRIDSIZE, grid2)
 displayships(player2ships)
 
 while True:
     placementprocess(grid2, player2ships)
-    showgrid(battlefieldsize, grid2)
+    showgrid(GRIDSIZE, grid2)
     displayships(player2ships)
 
     player2ships_values = player2ships.values()
@@ -276,11 +306,22 @@ turncounter = 0
 playertogo = random.randint(1, 2)
 
 while True:
-    if playertogo == 1:
+    if playertogo == 1 and AImode:
+        print("AI\'s turn!")
+        showgrid(GRIDSIZE, grid2_visible)
+        print(shootingprocess(GRIDSIZE, grid2, grid2_visible, AImode))
+        showgrid(GRIDSIZE, grid2_visible)
+
+        if sqarecheck(grid2) == 0:
+            print('Player 1 has won the game.')
+            break
+        playertogo = 2
+
+    elif playertogo == 1:
         print("Player 1\'s turn!")
-        showgrid(battlefieldsize, grid2_visible)
-        print(shootingprocess(battlefieldsize, grid2, grid2_visible))
-        showgrid(battlefieldsize, grid2_visible)
+        showgrid(GRIDSIZE, grid2_visible)
+        print(shootingprocess(GRIDSIZE, grid2, grid2_visible))
+        showgrid(GRIDSIZE, grid2_visible)
         if sqarecheck(grid2) == 0:
             print('Player 1 has won the game.')
             break
@@ -288,9 +329,9 @@ while True:
 
     if playertogo == 2:
         print("Player 2\'s turn!")
-        showgrid(battlefieldsize, grid1_visible)
-        print(shootingprocess(battlefieldsize, grid1, grid1_visible))
-        showgrid(battlefieldsize, grid1_visible)
+        showgrid(GRIDSIZE, grid1_visible)
+        print(shootingprocess(GRIDSIZE, grid1, grid1_visible))
+        showgrid(GRIDSIZE, grid1_visible)
         if sqarecheck(grid1) == 0:
             print('Player 2 has won the game.')
             break
