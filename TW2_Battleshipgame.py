@@ -117,30 +117,36 @@ def validatecoordinate(grid_size, coordinate, grid):
 
 
 def resolve_AI_state(state):
+
     if state == "CHANGE_DIR":
         print('resolving CHANGE_DIR...')
         AI_instructionlist.clear()
+        global AI_directionindex
         AI_directionindex += 1
 
         if AI_directionindex > 3:
-            AI_directionindex.clear()
+            AI_directionlist.clear()
             AI_state = "RANDOM"
+            print('new AI state is: ', AI_state)
             return
 
         AI_makeinstructionlist(AI_primarypoint, AI_directionlist, AI_directionindex, 5)
+        print('resolved CHANGE_DIR.')
 
     if state == "TURN_AROUND":
         print('resolving TURN_AROUND...')
         AI_directionindex += 2
 
         if AI_directionindex > 3:
-            AI_directionindex.clear()
+            AI_directionlist.clear()
             AI_state = "RANDOM"
+            print('new AI state is: ', AI_state)
             return
 
         AI_instructionlist.clear()
         AI_makeinstructionlist(AI_primarypoint, AI_directionlist, AI_directionindex, 5)
-
+        AI_hitcounter = 0
+        print('resolved TURN_AROUND.')
 #  >>>>>>> MAIN <<<<<<<<
 
 
