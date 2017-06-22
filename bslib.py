@@ -80,7 +80,6 @@ def placementprocess(grid, grid_size, playerships, placement_mode=2):
                         continue
                     else:
                         i += 1
-
             return
 
     while True:

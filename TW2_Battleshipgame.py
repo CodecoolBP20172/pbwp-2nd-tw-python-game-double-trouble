@@ -8,9 +8,10 @@ import bslib  # local module
 GRIDSIZE = 10  # 10 makes the most sense, ship placement is possible and does not take too long
 AImode = False  # switch to control AI mode for functions
 AI_hitcounter = 0  # to count the number of consecutive hits
-AI_directionlist = []  # stores direction order
+AI_directionlist = []  # stores generated direction data
 AI_instructionlist = []  # the AI uses this list to properly guess ship positions upon hitting
 AI_directionindex = 0  # controls the direction of attempts from the first hit
+AI_state = "RANDOM"  # possible states: RANDOM, FIRST_HIT, TURN_AROUND, MULTIPLE_HITS
 
 if "demo" in sys.argv:
     player1ships = {"h2": 0, "h3": 1, "h5": 0, "v2": 0, "v3": 0, "v5": 0}
@@ -21,10 +22,11 @@ else:
 
 
 def debug_printAIdata():
+    print("STATE: ", AI_state)
     print('hitcount: ', AI_hitcounter)
+    print('directionindex: ', AI_directionindex)
     print('directionlist: ', AI_directionlist)
     print('instructionlist: ', AI_instructionlist)
-    print('directionindex: ', AI_directionindex)
 
 
 def shootingprocess(grid_size, grid, grid_visible, AI_mode=False, coordinates=None):
@@ -83,6 +85,7 @@ def sqarecheck(grid):
 
 
 def AI_rolldirection():
+    AI_directionlist.clear()
     dice = random.randint(1, 4)
     if dice == 1:
         return [(0, -1), (1, 0), (0, 1), (-1, 0)]  # down, right, up, left
@@ -106,14 +109,41 @@ def AI_makeinstructionlist(coord, directionlist, dirindex, howmanytimes):
 def validatecoordinate(grid_size, coordinate, grid):
     for coord in coordinate:
         if coord > grid_size-1 or coord < 0:
-            return False
+            return "TURN_AROUND"
     for coord in coordinate:
         if grid[coordinate[1]][coordinate[0]] == '  0':
-            return False
-    return True
+            return "CHANGE_DIR"
+    return None
 
 
-# MAIN
+def resolve_AI_state(state):
+    if state == "CHANGE_DIR":
+        print('resolving CHANGE_DIR...')
+        AI_instructionlist.clear()
+        AI_directionindex += 1
+
+        if AI_directionindex > 3:
+            AI_directionindex.clear()
+            AI_state = "RANDOM"
+            return
+
+        AI_makeinstructionlist(AI_primarypoint, AI_directionlist, AI_directionindex, 5)
+
+    if state == "TURN_AROUND":
+        print('resolving TURN_AROUND...')
+        AI_directionindex += 2
+
+        if AI_directionindex > 3:
+            AI_directionindex.clear()
+            AI_state = "RANDOM"
+            return
+
+        AI_instructionlist.clear()
+        AI_makeinstructionlist(AI_primarypoint, AI_directionlist, AI_directionindex, 5)
+
+#  >>>>>>> MAIN <<<<<<<<
+
+
 os.system("clear")
 if "demo" in sys.argv:
     print(Fore.RED + "=====BATTLESHIP GAME - DEMO=====>" + Fore.RESET)
@@ -192,64 +222,125 @@ turncounter = 0
 playertogo = random.randint(1, 2)
 
 while True:
-    if playertogo == 1 and AImode:
+    if playertogo == 1 and AImode:  # begin AI block
         print("AI\'s turn!")
 
-        if AI_hitcounter < 1:
+        if AI_state == "FIRST_HIT":
+            while True:
+                if AI_state == "RANDOM":  # Resolving a previous state can produce this state
+                    next_coord = None
+                else:
+                    next_coord = AI_instructionlist[AI_hitcounter-1]
+                    validationresult = validatecoordinate(GRIDSIZE, next_coord, grid2_visible)
+                    if validationresult is None:
+                        break
+                    else:
+                        resolve_AI_state(validationresult)
+                    continue
+
+            result = shootingprocess(GRIDSIZE, grid2, grid2_visible, AImode, coordinates=next_coord)
+            if type(result) == tuple:  # we have a hit, function returned tuple
+                AI_hitcounter += 1
+                AI_state = "MULTIPLE_HITS"
+                debug_printAIdata()
+                bslib.showgrid(GRIDSIZE, grid2_visible)
+                playertogo = 2
+            else:  # we have a miss, change direction
+                AI_state = "CHANGE_DIR"
+                debug_printAIdata()
+                bslib.showgrid(GRIDSIZE, grid2_visible)
+                playertogo = 2
+
+        if AI_state == "MULTIPLE_HITS" and playertogo == 1:
+            while True:
+                if AI_state == "RANDOM":  # Resolving a previous state can produce this state
+                    next_coord = None
+                else:
+                    next_coord = AI_instructionlist[AI_hitcounter-1]
+                    validationresult = validatecoordinate(GRIDSIZE, next_coord, grid2_visible)
+                    if validationresult is None:
+                        break
+                    else:
+                        resolve_AI_state(validationresult)
+                    continue
+
+            result = shootingprocess(GRIDSIZE, grid2, grid2_visible, AImode, coordinates=next_coord)
+            if type(result) == tuple:  # we have a hit, function returned tuple
+                AI_hitcounter += 1
+                AI_state = "MULTIPLE_HITS"
+                debug_printAIdata()
+                bslib.showgrid(GRIDSIZE, grid2_visible)
+                playertogo = 2
+            else:  # we have a miss, turn around!
+                AI_state = "TURN_AROUND"
+                debug_printAIdata()
+                bslib.showgrid(GRIDSIZE, grid2_visible)
+                playertogo = 2
+
+        if AI_state == "CHANGE_DIR" and playertogo == 1:
+            resolve_AI_state("CHANGE_DIR")
+            AI_hitcounter = 1
+            next_coord = AI_instructionlist[AI_hitcounter-1]  # the trust is strong with this one xD
+
+            result = shootingprocess(GRIDSIZE, grid2, grid2_visible, AImode, coordinates=next_coord)
+            if type(result) == tuple:  # we have a hit, function returned tuple
+                AI_hitcounter += 1
+                AI_state = "MULTIPLE_HITS"
+                debug_printAIdata()
+                bslib.showgrid(GRIDSIZE, grid2_visible)
+                playertogo = 2
+            else:  # we have a miss, keep changing direction!
+                AI_state = "CHANGE_DIR"
+                debug_printAIdata()
+                bslib.showgrid(GRIDSIZE, grid2_visible)
+                playertogo = 2
+
+        if AI_state == "TURN_AROUND" and playertogo == 1:
+            resolve_AI_state("TURN_AROUND")
+            while True:
+                if AI_state == "RANDOM":  # Resolving a previous state can produce this state
+                    next_coord = None
+                else:
+                    next_coord = AI_instructionlist[AI_hitcounter-1]
+                    validationresult = validatecoordinate(GRIDSIZE, next_coord, grid2_visible)
+                    if validationresult is None:
+                        break
+                    else:
+                        resolve_AI_state(validationresult)
+                    continue
+
+            result = shootingprocess(GRIDSIZE, grid2, grid2_visible, AImode, coordinates=next_coord)
+            if type(result) == tuple:  # we have a hit, function returned tuple
+                AI_hitcounter += 1
+                AI_state = "MULTIPLE_HITS"
+                debug_printAIdata()
+                bslib.showgrid(GRIDSIZE, grid2_visible)
+                playertogo = 2
+            else:  # we have a miss, job done, back to random shooting!
+                AI_state = "RANDOM"
+                debug_printAIdata()
+                bslib.showgrid(GRIDSIZE, grid2_visible)
+                playertogo = 2
+
+        if AI_state == "RANDOM" and playertogo == 1:
             result = shootingprocess(GRIDSIZE, grid2, grid2_visible, AImode)
             if type(result) == tuple:  # we have a hit, function returned tuple
                 AI_primarypoint = result
                 AI_hitcounter += 1
                 AI_directionlist = AI_rolldirection()
                 AI_makeinstructionlist(AI_primarypoint, AI_directionlist, AI_directionindex, 5)
-                debug_printAIdata()
                 print("AI has got a hit!")
-            else:  # miss
-                AI_hitcounter = 0
+                AI_state = "FIRST_HIT"
+                debug_printAIdata()
+                bslib.showgrid(GRIDSIZE, grid2_visible)
+                playertogo = 2
+            else:
                 print("AI missed!")
-        else:  # we have had at least 1 successful hit before
-            while True:
-                next_coord = AI_instructionlist[AI_hitcounter-1]
-                print('next coord will be: ', next_coord)
-                if not validatecoordinate(GRIDSIZE, next_coord, grid2_visible):
-                    AI_directionindex += 1
-                    AI_instructionlist.clear()
-                    AI_makeinstructionlist(AI_primarypoint, AI_directionlist, AI_directionindex, 5)
-                    continue
-                else:
-                    break
+                bslib.showgrid(GRIDSIZE, grid2_visible)
+                playertogo = 2
 
-            result = shootingprocess(GRIDSIZE, grid2, grid2_visible, AImode, coordinates=next_coord)
-            if type(result) == tuple:  # we have another consecutive hit
-                AI_hitcounter += 1
-                print("AI has got a hit!")
-
-                if AI_hitcounter == 5:
-                    AI_hitcounter = 0
-
-                debug_printAIdata()
-            else:  # we have had a hit before but now handle miss
-                if AI_hitcounter > 1:  # miss but more than 1 hit before
-                    AI_directionindex += 2
-                    AI_instructionlist.clear()
-                    AI_makeinstructionlist(AI_primarypoint, AI_directionlist, AI_directionindex, 5)
-                    debug_printAIdata()
-                    print("AI has got a hit!")
-                else:  # mis and only one hit before
-                    AI_directionindex += 1
-                    AI_instructionlist.clear()
-                    AI_makeinstructionlist(AI_primarypoint, AI_directionlist, AI_directionindex, 5)
-                    debug_printAIdata()
-                    print("AI has got a hit!")
-
-        bslib.showgrid(GRIDSIZE, grid2_visible)
-
-        if sqarecheck(grid2) == 0:
-            print('Player 1 has won the game.')
-            break
-        playertogo = 2
-
-    elif playertogo == 1:
+# -------------------------------------------------------------
+    elif playertogo == 1:  # begin player block
         print("Player 1\'s turn!")
         bslib.showgrid(GRIDSIZE, grid2_visible)
         print(shootingprocess(GRIDSIZE, grid2, grid2_visible))
