@@ -1,36 +1,56 @@
 import sys
 import os
+import random
 import bslib  # local module
 
+# Global stuff declaration
 
 GRIDSIZE = 10  # 10 makes the most sense, ship placement is possible and does not take too long
-AImode = False
+AImode = False  # switch to control AI mode for functions
+AI_hitcounter = 0  # to count the number of consecutive hits
+AI_directionlist = []  # stores direction order
+AI_instructionlist = []  # the AI uses this list to properly guess ship positions upon hitting
+AI_directionindex = 0  # controls the direction of attempts from the first hit
 
 if "demo" in sys.argv:
     player1ships = {"h2": 0, "h3": 1, "h5": 0, "v2": 0, "v3": 0, "v5": 0}
     player2ships = {"h2": 0, "h3": 0, "h5": 0, "v2": 0, "v3": 1, "v5": 0}
 else:
     player1ships = {"h2": 1, "h3": 1, "h5": 1, "v2": 1, "v3": 1, "v5": 1}
-    player2ships = {"h2": 1, "h3": 1, "h5": 1, "v2": 1, "v3": 1, "v5": 1}
+    player2ships = {"h2": 0, "h3": 0, "h5": 2, "v2": 0, "v3": 0, "v5": 1}
 
 
-def shootingprocess(grid_size, grid, grid_visible, mode=False):
-    if mode:
-        if shoot(generate_cordinates(grid_size), generate_cordinates(grid_size), grid, grid_visible):
-            return 'AI\'s got a hit!'
+def debug_printAIdata():
+    print('hitcount: ', AI_hitcounter)
+    print('directionlist: ', AI_directionlist)
+    print('instructionlist: ', AI_instructionlist)
+    print('directionindex: ', AI_directionindex)
+
+
+def shootingprocess(grid_size, grid, grid_visible, AI_mode=False, coordinates=None):
+    if AI_mode:
+        if coordinates is None:  # check if we've got coordinates, if none then generate random
+            x = bslib.generate_cordinates(grid_size)
+            y = bslib.generate_cordinates(grid_size)
+        else:  # if yes then use these instead of generating
+            x = coordinates[0]
+            y = coordinates[1]
+        if shoot(x, y, grid, grid_visible):
+            return x, y
         else:
-            return 'AI missed!'
+            return None
 
     print('Specify the coordinates of the target!')
     while True:
         try:
             x = int(input('x:'))
-            if x > grid_size - 1:
-                print('This coordinate is too large!')
+            print('grid size is: ', grid_size)
+            if x > grid_size-1 or x < 0:
+                print('This coordinate is out of range!')
                 continue
             y = int(input('y:'))
-            if y > grid_size - 1:
-                print('This coordinate is too large!')
+            if y > grid_size-1 or y < 0:
+                print('This coordinate is out of range!')
                 continue
         except ValueError:
             print('incorrect input!')
@@ -60,6 +80,37 @@ def sqarecheck(grid):
             if item == '  ⬜':
                 count += 1
     return count
+
+
+def AI_rolldirection():
+    dice = random.randint(1, 4)
+    if dice == 1:
+        return [(0, -1), (1, 0), (0, 1), (-1, 0)]  # down, right, up, left
+    if dice == 2:
+        return [(1, 0), (0, 1), (-1, 0), (0, -1)]  # right, up, left, down
+    if dice == 3:
+        return [(-1, 0), (0, -1), (1, 0), (0, 1)]  # left, down, right, up
+    if dice == 4:
+        return [(0, 1), (-1, 0), (0, -1), (1, 0)]  # up, left, down, right
+
+
+def AI_makeinstructionlist(coord, directionlist, dirindex, howmanytimes):
+    if howmanytimes == 0:  # stopping condition for the recursion
+        return
+    else:
+        item = tuple(x+y for x, y in zip(coord, directionlist[dirindex]))
+        AI_instructionlist.append(item)
+        AI_makeinstructionlist(item, directionlist, dirindex, howmanytimes-1)
+
+
+def validatecoordinate(grid_size, coordinate, grid):
+    for coord in coordinate:
+        if coord > grid_size-1 or coord < 0:
+            return False
+    for coord in coordinate:
+        if grid[coordinate[1]][coordinate[0]] == '  0':
+            return False
+    return True
 
 
 # MAIN
@@ -143,8 +194,54 @@ playertogo = random.randint(1, 2)
 while True:
     if playertogo == 1 and AImode:
         print("AI\'s turn!")
-        bslib.showgrid(GRIDSIZE, grid2_visible)
-        print(shootingprocess(GRIDSIZE, grid2, grid2_visible, AImode))
+
+        if AI_hitcounter < 1:
+            result = shootingprocess(GRIDSIZE, grid2, grid2_visible, AImode)
+            if type(result) == tuple:  # we have a hit, function returned tuple
+                AI_primarypoint = result
+                AI_hitcounter += 1
+                AI_directionlist = AI_rolldirection()
+                AI_makeinstructionlist(AI_primarypoint, AI_directionlist, AI_directionindex, 5)
+                debug_printAIdata()
+                print("AI has got a hit!")
+            else:  # miss
+                AI_hitcounter = 0
+                print("AI missed!")
+        else:  # we have had at least 1 successful hit before
+            while True:
+                next_coord = AI_instructionlist[AI_hitcounter-1]
+                print('next coord will be: ', next_coord)
+                if not validatecoordinate(GRIDSIZE, next_coord, grid2_visible):
+                    AI_directionindex += 1
+                    AI_instructionlist.clear()
+                    AI_makeinstructionlist(AI_primarypoint, AI_directionlist, AI_directionindex, 5)
+                    continue
+                else:
+                    break
+
+            result = shootingprocess(GRIDSIZE, grid2, grid2_visible, AImode, coordinates=next_coord)
+            if type(result) == tuple:  # we have another consecutive hit
+                AI_hitcounter += 1
+                print("AI has got a hit!")
+
+                if AI_hitcounter == 5:
+                    AI_hitcounter = 0
+
+                debug_printAIdata()
+            else:  # we have had a hit before but now handle miss
+                if AI_hitcounter > 1:  # miss but more than 1 hit before
+                    AI_directionindex += 2
+                    AI_instructionlist.clear()
+                    AI_makeinstructionlist(AI_primarypoint, AI_directionlist, AI_directionindex, 5)
+                    debug_printAIdata()
+                    print("AI has got a hit!")
+                else:  # mis and only one hit before
+                    AI_directionindex += 1
+                    AI_instructionlist.clear()
+                    AI_makeinstructionlist(AI_primarypoint, AI_directionlist, AI_directionindex, 5)
+                    debug_printAIdata()
+                    print("AI has got a hit!")
+
         bslib.showgrid(GRIDSIZE, grid2_visible)
 
         if sqarecheck(grid2) == 0:

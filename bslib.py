@@ -84,6 +84,7 @@ def placementprocess(grid, grid_size, playerships, placement_mode=2):
             return
 
     while True:
+
         shiptype = input('Choose shiptype: ')
         if shiptype not in playerships or playerships[shiptype] == 0:
             print(
@@ -94,7 +95,7 @@ def placementprocess(grid, grid_size, playerships, placement_mode=2):
     while True:
         try:
             x = int(input('Pick your ship\'s x coordinate: '))
-            if 0 > x > grid_size - 1:
+            if x > grid_size-1 or x < 0:
                 print('This coordinate is out of range!')
                 continue
         except ValueError:
@@ -102,7 +103,7 @@ def placementprocess(grid, grid_size, playerships, placement_mode=2):
             continue
         try:
             y = int(input('Pick your ship\'s y coordinate: '))
-            if 0 > y > grid_size - 1:
+            if y > grid_size-1 or y < 0:
                 print('This coordinate is out of range!')
                 continue
         except ValueError:
