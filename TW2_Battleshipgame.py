@@ -46,7 +46,6 @@ def shootingprocess(grid_size, grid, grid_visible, AI_mode=False, coordinates=No
     while True:
         try:
             x = int(input('x:'))
-            print('grid size is: ', grid_size)
             if x > grid_size-1 or x < 0:
                 print('This coordinate is out of range!')
                 continue
@@ -123,6 +122,7 @@ def resolve_AI_state(state):
         AI_instructionlist.clear()
         global AI_directionindex
         AI_directionindex += 1
+        print("changed directionindex to: ", AI_directionindex)
 
         if AI_directionindex > 3:
             AI_directionlist.clear()
@@ -136,6 +136,7 @@ def resolve_AI_state(state):
     if state == "TURN_AROUND":
         print('resolving TURN_AROUND...')
         AI_directionindex += 2
+        print("changed directionindex to: ", AI_directionindex)
 
         if AI_directionindex > 3:
             AI_directionlist.clear()
@@ -277,11 +278,17 @@ while True:
                 debug_printAIdata()
                 bslib.showgrid(GRIDSIZE, grid2_visible)
                 playertogo = 2
-            else:  # we have a miss, turn around!
-                AI_state = "TURN_AROUND"
-                debug_printAIdata()
-                bslib.showgrid(GRIDSIZE, grid2_visible)
-                playertogo = 2
+            else:  # we have a miss, check number of hits and decide based on that
+                if AI_hitcounter > 4:
+                    AI_state = "RANDOM"
+                    debug_printAIdata()
+                    bslib.showgrid(GRIDSIZE, grid2_visible)
+                    playertogo = 2
+                else:
+                    AI_state = "TURN_AROUND"
+                    debug_printAIdata()
+                    bslib.showgrid(GRIDSIZE, grid2_visible)
+                    playertogo = 2
 
         if AI_state == "CHANGE_DIR" and playertogo == 1:
             resolve_AI_state("CHANGE_DIR")
