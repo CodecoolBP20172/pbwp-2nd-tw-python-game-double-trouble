@@ -7,11 +7,12 @@ import bslib  # local module
 
 GRIDSIZE = 10  # 10 makes the most sense, ship placement is possible and does not take too long
 AImode = False  # switch to control AI mode for functions
+AI_primarypoint = tuple  # The AI remembers and uses the coords of the first hit
 AI_hitcounter = 0  # to count the number of consecutive hits
 AI_directionlist = []  # stores generated direction data
 AI_instructionlist = []  # the AI uses this list to properly guess ship positions upon hitting
-AI_directionindex = 0  # controls the direction of attempts from the first hit
-AI_state = "RANDOM"  # possible states: RANDOM, FIRST_HIT, TURN_AROUND, MULTIPLE_HITS
+AI_direction = tuple  # controls the direction of attempts from the first hit
+AI_state = "RANDOM"  # possible states: RANDOM, FIRST_HIT, TURN_AROUND, MULTIPLE_HITS, CHANGE_DIR
 
 if "demo" in sys.argv:
     player1ships = {"h2": 0, "h3": 1, "h5": 0, "v2": 0, "v3": 0, "v5": 0}
@@ -23,9 +24,10 @@ else:
 
 def debug_printAIdata():
     print("STATE: ", AI_state)
+    print("primary point: ", AI_primarypoint)
     print('hitcount: ', AI_hitcounter)
-    print('directionindex: ', AI_directionindex)
     print('directionlist: ', AI_directionlist)
+    print('direction: ', AI_direction)
     print('instructionlist: ', AI_instructionlist)
 
 
@@ -96,13 +98,13 @@ def AI_rolldirection():
         return [(0, 1), (-1, 0), (0, -1), (1, 0)]  # up, left, down, right
 
 
-def AI_makeinstructionlist(coord, directionlist, dirindex, howmanytimes):
+def AI_makeinstructionlist(coord, direction, howmanytimes):
     if howmanytimes == 0:  # stopping condition for the recursion
         return
     else:
-        item = tuple(x+y for x, y in zip(coord, directionlist[dirindex]))
+        item = tuple(x+y for x, y in zip(coord, direction))
         AI_instructionlist.append(item)
-        AI_makeinstructionlist(item, directionlist, dirindex, howmanytimes-1)
+        AI_makeinstructionlist(item, direction, howmanytimes-1)
 
 
 def validatecoordinate(grid_size, coordinate, grid):
@@ -120,34 +122,36 @@ def resolve_AI_state(state):
     if state == "CHANGE_DIR":
         print('resolving CHANGE_DIR...')
         AI_instructionlist.clear()
-        global AI_directionindex
-        AI_directionindex += 1
-        print("changed directionindex to: ", AI_directionindex)
-
-        if AI_directionindex > 3:
+        try:
+            AI_direction = AI_directionlist.pop(0)
+        except IndexError:
             AI_directionlist.clear()
             AI_state = "RANDOM"
             print('new AI state is: ', AI_state)
             return
 
-        AI_makeinstructionlist(AI_primarypoint, AI_directionlist, AI_directionindex, 5)
+        print("changed direction to: ", AI_direction)
+
+        AI_makeinstructionlist(AI_primarypoint, AI_direction, 5)
         print('resolved CHANGE_DIR.')
 
-    if state == "TURN_AROUND":
+    elif state == "TURN_AROUND":
         print('resolving TURN_AROUND...')
-        AI_directionindex += 2
-        print("changed directionindex to: ", AI_directionindex)
-
-        if AI_directionindex > 3:
+        try:
+            AI_direction = AI_directionlist.pop(1)
+        except IndexError:
             AI_directionlist.clear()
             AI_state = "RANDOM"
             print('new AI state is: ', AI_state)
             return
+        print("changed direction to: ", AI_direction)
 
-        AI_instructionlist.clear()
-        AI_makeinstructionlist(AI_primarypoint, AI_directionlist, AI_directionindex, 5)
-        AI_hitcounter = 0
+        AI_makeinstructionlist(AI_primarypoint, AI_direction, 5)
+        AI_hitcounter = 1
         print('resolved TURN_AROUND.')
+    else:
+        print('no resolving exists for this state: ', state)
+        sys.exit('Program will now terminate :( )')
 #  >>>>>>> MAIN <<<<<<<<
 
 
@@ -236,12 +240,15 @@ while True:
             while True:
                 if AI_state == "RANDOM":  # Resolving a previous state can produce this state
                     next_coord = None
+                    break
                 else:
                     next_coord = AI_instructionlist[AI_hitcounter-1]
                     validationresult = validatecoordinate(GRIDSIZE, next_coord, grid2_visible)
                     if validationresult is None:
+                        print('coordinate validated!')
                         break
                     else:
+                        print('coordinate validation failed!', next_coord)
                         resolve_AI_state(validationresult)
                     continue
 
@@ -262,12 +269,15 @@ while True:
             while True:
                 if AI_state == "RANDOM":  # Resolving a previous state can produce this state
                     next_coord = None
+                    break
                 else:
                     next_coord = AI_instructionlist[AI_hitcounter-1]
                     validationresult = validatecoordinate(GRIDSIZE, next_coord, grid2_visible)
                     if validationresult is None:
+                        print('coordinate validated!')
                         break
                     else:
+                        print('coordinate validation failed!', next_coord)
                         resolve_AI_state(validationresult)
                     continue
 
@@ -280,7 +290,10 @@ while True:
                 playertogo = 2
             else:  # we have a miss, check number of hits and decide based on that
                 if AI_hitcounter > 4:
+                    print('max. allowed consecutive hits reached! switching to RANDOM')
                     AI_state = "RANDOM"
+                    AI_instructionlist.clear()
+                    AI_hitcounter = 0
                     debug_printAIdata()
                     bslib.showgrid(GRIDSIZE, grid2_visible)
                     playertogo = 2
@@ -293,7 +306,20 @@ while True:
         if AI_state == "CHANGE_DIR" and playertogo == 1:
             resolve_AI_state("CHANGE_DIR")
             AI_hitcounter = 1
-            next_coord = AI_instructionlist[AI_hitcounter-1]  # the trust is strong with this one xD
+            while True:
+                if AI_state == "RANDOM":  # Resolving a previous state can produce this state
+                    next_coord = None
+                    break
+                else:
+                    next_coord = AI_instructionlist[AI_hitcounter-1]
+                    validationresult = validatecoordinate(GRIDSIZE, next_coord, grid2_visible)
+                    if validationresult is None:
+                        print('coordinate validated!')
+                        break
+                    else:
+                        print('coordinate validation failed!', next_coord)
+                        resolve_AI_state(validationresult)
+                    continue
 
             result = shootingprocess(GRIDSIZE, grid2, grid2_visible, AImode, coordinates=next_coord)
             if type(result) == tuple:  # we have a hit, function returned tuple
@@ -313,12 +339,15 @@ while True:
             while True:
                 if AI_state == "RANDOM":  # Resolving a previous state can produce this state
                     next_coord = None
+                    break
                 else:
                     next_coord = AI_instructionlist[AI_hitcounter-1]
                     validationresult = validatecoordinate(GRIDSIZE, next_coord, grid2_visible)
                     if validationresult is None:
+                        print('coordinate validated!')
                         break
                     else:
+                        print('coordinate validation failed!', next_coord)
                         resolve_AI_state(validationresult)
                     continue
 
@@ -341,7 +370,8 @@ while True:
                 AI_primarypoint = result
                 AI_hitcounter += 1
                 AI_directionlist = AI_rolldirection()
-                AI_makeinstructionlist(AI_primarypoint, AI_directionlist, AI_directionindex, 5)
+                AI_direction = AI_directionlist.pop(0)
+                AI_makeinstructionlist(AI_primarypoint, AI_direction, 5)
                 print("AI has got a hit!")
                 AI_state = "FIRST_HIT"
                 debug_printAIdata()
