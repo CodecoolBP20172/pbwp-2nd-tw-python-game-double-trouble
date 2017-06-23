@@ -14,6 +14,8 @@ AI_instructionlist = []  # the AI uses this list to properly guess ship position
 AI_direction = tuple  # controls the direction of attempts from the first hit
 AI_state = "RANDOM"  # possible states: RANDOM, FIRST_HIT, TURN_AROUND, MULTIPLE_HITS, CHANGE_DIR
 
+debug_callcounter = 0
+
 if "demo" in sys.argv:
     player1ships = {"h2": 0, "h3": 1, "h5": 0, "v2": 0, "v3": 0, "v5": 0}
     player2ships = {"h2": 0, "h3": 0, "h5": 0, "v2": 0, "v3": 1, "v5": 0}
@@ -31,11 +33,33 @@ def debug_printAIdata():
     print('instructionlist: ', AI_instructionlist)
 
 
+def validatecoordinate(grid_size, coordinate, grid):
+    for coord in coordinate:
+        if coord > grid_size-1 or coord < 0:
+            return "TURN_AROUND"
+    for coord in coordinate:
+        if grid[coordinate[1]][coordinate[0]] == '  0':
+            return "CHANGE_DIR"
+    return None
+
+
 def shootingprocess(grid_size, grid, grid_visible, AI_mode=False, coordinates=None):
     if AI_mode:
         if coordinates is None:  # check if we've got coordinates, if none then generate random
-            x = bslib.generate_cordinates(grid_size)
-            y = bslib.generate_cordinates(grid_size)
+            While True:
+                x = bslib.generate_cordinates(grid_size)
+            if validatecoordinate(grid_size, x, grid) is None:
+                break
+            else:
+                continue
+
+            While True:
+                y = bslib.generate_cordinates(grid_size)
+            if validatecoordinate(grid_size, y, grid) is None:
+                break
+            else:
+                continue
+
         else:  # if yes then use these instead of generating
             x = coordinates[0]
             y = coordinates[1]
@@ -107,22 +131,20 @@ def AI_makeinstructionlist(coord, direction, howmanytimes):
         AI_makeinstructionlist(item, direction, howmanytimes-1)
 
 
-def validatecoordinate(grid_size, coordinate, grid):
-    for coord in coordinate:
-        if coord > grid_size-1 or coord < 0:
-            return "TURN_AROUND"
-    for coord in coordinate:
-        if grid[coordinate[1]][coordinate[0]] == '  0':
-            return "CHANGE_DIR"
-    return None
-
-
 def resolve_AI_state(state):
-
+    global debug_callcounter
+    global AI_hitcounter
+    debug_callcounter += 1
     if state == "CHANGE_DIR":
+
+        if debug_callcounter > 5:  # debug IF block
+            print('too many resolve function calls at once!')
+            sys.exit('Program will now terminate :( ')
         print('resolving CHANGE_DIR...')
+
         AI_instructionlist.clear()
         try:
+            global AI_direction
             AI_direction = AI_directionlist.pop(0)
         except IndexError:
             AI_directionlist.clear()
@@ -136,9 +158,20 @@ def resolve_AI_state(state):
         print('resolved CHANGE_DIR.')
 
     elif state == "TURN_AROUND":
+
+        if debug_callcounter > 5:  # debug IF block
+            print('too many resolve function calls at once!')
+            sys.exit('Program will now terminate :( ')
+
         print('resolving TURN_AROUND...')
+        AI_instructionlist.clear()
         try:
-            AI_direction = AI_directionlist.pop(1)
+            if len(AI_directionlist) < 3:
+                global AI_direction
+                AI_direction = AI_directionlist.pop(0)
+            else:
+                global AI_direction
+                AI_direction = AI_directionlist.pop(1)
         except IndexError:
             AI_directionlist.clear()
             AI_state = "RANDOM"
@@ -147,7 +180,8 @@ def resolve_AI_state(state):
         print("changed direction to: ", AI_direction)
 
         AI_makeinstructionlist(AI_primarypoint, AI_direction, 5)
-        AI_hitcounter = 1
+        print('new instruction list is: ', AI_instructionlist)
+        AI_hitcounter = 0
         print('resolved TURN_AROUND.')
     else:
         print('no resolving exists for this state: ', state)
@@ -394,6 +428,8 @@ while True:
         playertogo = 2
 
     if playertogo == 2:
+        global debug_callcounter
+        debug_callcounter = 0
         print("Player 2\'s turn!")
         bslib.showgrid(GRIDSIZE, grid1_visible)
         print(shootingprocess(GRIDSIZE, grid1, grid1_visible))
