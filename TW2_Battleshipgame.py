@@ -46,19 +46,19 @@ def validatecoordinate(grid_size, coordinate, grid):
 def shootingprocess(grid_size, grid, grid_visible, AI_mode=False, coordinates=None):
     if AI_mode:
         if coordinates is None:  # check if we've got coordinates, if none then generate random
-            While True:
+            while True:
                 x = bslib.generate_cordinates(grid_size)
-            if validatecoordinate(grid_size, x, grid) is None:
-                break
-            else:
-                continue
+                if validatecoordinate(grid_size, x, grid) is None:
+                    break
+                else:
+                    continue
 
-            While True:
+            while True:
                 y = bslib.generate_cordinates(grid_size)
-            if validatecoordinate(grid_size, y, grid) is None:
-                break
-            else:
-                continue
+                if validatecoordinate(grid_size, y, grid) is None:
+                    break
+                else:
+                    continue
 
         else:  # if yes then use these instead of generating
             x = coordinates[0]
