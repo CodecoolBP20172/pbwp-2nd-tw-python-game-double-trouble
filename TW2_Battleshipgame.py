@@ -38,7 +38,7 @@ def validatecoordinate(grid_size, coordinate, grid):
         if coord > grid_size-1 or coord < 0:
             return "TURN_AROUND"
     for coord in coordinate:
-        if grid[coordinate[1]][coordinate[0]] == '  0':
+        if grid[coordinate[1]][coordinate[0]] == '  0' or grid[coordinate[1]][coordinate[0]] == '  X':
             return "CHANGE_DIR"
     return None
 
@@ -48,14 +48,9 @@ def shootingprocess(grid_size, grid, grid_visible, AI_mode=False, coordinates=No
         if coordinates is None:  # check if we've got coordinates, if none then generate random
             while True:
                 x = bslib.generate_cordinates(grid_size)
-                if validatecoordinate(grid_size, x, grid) is None:
-                    break
-                else:
-                    continue
-
-            while True:
                 y = bslib.generate_cordinates(grid_size)
-                if validatecoordinate(grid_size, y, grid) is None:
+                coordinates = (x, y)
+                if validatecoordinate(grid_size, coordinates, grid) is None:
                     break
                 else:
                     continue
